@@ -93,6 +93,7 @@ async def process_batch_output(
     batch_status = batch.status
     if batch_status != "completed":
         print(f"Batch {batch.id} not completed successfully. Final status: {batch_status}")
+        print(f'batch: {batch}')
         return
 
     error_file_id = batch.error_file_id
