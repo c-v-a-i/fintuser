@@ -1,0 +1,39 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider             = "prisma-client-py"
+  recursive_type_depth = -1
+}
+
+/// Instead of storing messages in JSON or a composite type, we store them in a separate model
+enum Role {
+  user
+  assistant
+}
+
+model Document {
+  id                    String                  @id
+  mime_type             String
+  documentBlob          Bytes
+  messages              DocumentMessage[]
+  DocumentTranscription DocumentTranscription[]
+}
+
+model DocumentMessage {
+  id         String   @id @default(uuid())
+  role       Role
+  content    String
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id])
+}
+
+model DocumentTranscription {
+  id                      String   @id @default(uuid())
+  version                 Int
+  document_representation String
+  documentId              String
+  document                Document @relation(fields: [documentId], references: [id])
+}
