@@ -2,8 +2,8 @@ import json
 from prisma.enums import Role
 from prisma import Prisma
 from openai.types import Batch
-from openai_client import client
-from response_schema import GPTOutputSchema
+from src.openai_client import client
+from src.chat_data_transform_utils.response_schema import GPTOutputSchema
 
 
 async def save_response_to_db(text_response: str, db: Prisma):
@@ -80,11 +80,9 @@ async def save_response_to_db(text_response: str, db: Prisma):
         print(f"Saved document {document_id} with {len(gpt_data.conversation_translation)} messages")
 
 
-
 async def process_batch_output(
-    db: Prisma,
-    batch:  Batch,
-    output_filename
+        batch: Batch,
+        output_filename
 ) -> None:
     """
     If the batch is completed, download the results, parse them,
@@ -116,4 +114,4 @@ async def process_batch_output(
     with open(output_filename, "w") as f:
         print(text_response, file=f)
 
-    await save_response_to_db(text_response, db)
+    return text_response

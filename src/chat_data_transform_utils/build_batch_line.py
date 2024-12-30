@@ -1,14 +1,14 @@
 import json
 import openai.lib._parsing as parsing
-from response_schema import GPTOutputSchema
+from src.chat_data_transform_utils.response_schema import GPTOutputSchema
 
 
 def build_batch_line(
-    doc_id: str,
-    review_conversation: str,
-    png_bytes_b64: str,
-    system_prompt: str,
-    model: str
+        doc_id: str,
+        review_conversation: str,
+        png_bytes_b64: str,
+        system_prompt: str,
+        model: str
 ) -> str:
     user_message_content = [
         {
@@ -35,7 +35,7 @@ def build_batch_line(
             "model": model,
             "messages": [
                 {"role": "system", "content": system_prompt},
-                {"role": "user",  "content": user_message_content},
+                {"role": "user", "content": user_message_content},
             ],
             "response_format": response_format,
             "max_tokens": 8000,

@@ -32,5 +32,5 @@ I filtered out CVs with the names that don't make much sense. Like `xxxx.pdf` or
 
 There are no script doing this job so far in the repo.
 
-- [create-message-chains.py](create-message-chains.py) takes care of transformation unstructured data into `ProcessedMessages` type.
-- [main.py](main.py) takes the output of `create-message-chains.py`, translates the text into english and adds a yaml representation of PDF documents. So we can fine-tune both on raw documents and the transcriptions of the documents.
+- [create-message-chains.py](src/create_message_chains.py) takes care of transformation unstructured data into `ProcessedMessages` type.
+- [transform_chat_data.py](src/transform_chat_data.py) takes the output of `create-message-chains.py`, and uses gpt-4o-mini to translate the text into english and add a yaml representation of PDF documents. So we can fine-tune both on raw documents and the transcriptions of the documents.

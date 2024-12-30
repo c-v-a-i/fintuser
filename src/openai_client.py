@@ -1,6 +1,7 @@
 import os
 from openai import OpenAI
 
+
 class OpenAIClientSingleton:
     """
     Simple singleton wrapper around the OpenAI client.
@@ -26,4 +27,3 @@ class OpenAIClientSingleton:
 
 
 client = OpenAIClientSingleton()
-
