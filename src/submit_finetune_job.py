@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 
 """
-submit-finetune-job.py
+submit_finetune_job.py
 ----------------------
 Submits your JSONL file to OpenAI for fine-tuning.
 
 Usage:
   export OPENAI_API_KEY="sk-..."
-  ./submit-finetune-job.py <training_dataset.jsonl>
+  ./submit_finetune_job.py <training_dataset.jsonl>
 """
 
 import os
@@ -18,10 +18,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+N_EPOCHS = 2
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_BASE = "https://api.openai.com/v1"
-MODEL = "gpt-4o-mini"  # Example model name
-N_EPOCHS = 3  # Example default
+MODEL = "gpt-4o-mini-2024-07-18"
 
 
 def upload_file(file_path: str) -> str:
@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
     # Ensure a training dataset argument is provided
     if len(sys.argv) < 2:
-        print("Usage: ./submit-finetune-job.py <training_dataset.jsonl>")
+        print("Usage: ./submit_finetune_job.py <training_dataset.jsonl>")
         sys.exit(1)
 
     TRAINING_DATASET = sys.argv[1]

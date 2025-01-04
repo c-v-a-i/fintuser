@@ -1,21 +1,19 @@
 MAX_TOKENS_PER_EXAMPLE = 16385
 
-MODEL = 'gpt-4o-mini'
-TARGET_EPOCHS = 3
 MIN_TARGET_EXAMPLES = 100
 MAX_TARGET_EXAMPLES = 25000
 MIN_DEFAULT_EPOCHS = 1
 MAX_DEFAULT_EPOCHS = 25
 
-def estimate_n_epochs(n_train_examples: int) -> int:
+def estimate_n_epochs(n_train_examples: int, n_epochs: int) -> int:
     """
     Estimate the default number of epochs based on the target data size constraints.
     """
-    n_epochs = TARGET_EPOCHS
-    if n_train_examples * TARGET_EPOCHS < MIN_TARGET_EXAMPLES:
+    n_epochs = n_epochs
+    if n_train_examples * n_epochs < MIN_TARGET_EXAMPLES:
         # Not enough total examples; increase epochs
         n_epochs = min(MAX_DEFAULT_EPOCHS, MIN_TARGET_EXAMPLES // n_train_examples)
-    elif n_train_examples * TARGET_EPOCHS > MAX_TARGET_EXAMPLES:
+    elif n_train_examples * n_epochs > MAX_TARGET_EXAMPLES:
         # Too many total examples; reduce epochs
         n_epochs = max(MIN_DEFAULT_EPOCHS, MAX_TARGET_EXAMPLES // n_train_examples)
     return n_epochs

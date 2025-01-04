@@ -19,6 +19,8 @@ from pydantic import BaseModel
 from fine_tuning_utils.dataset_statistics import calculate_billing_tokens, estimate_n_epochs, print_billing_info
 from dotenv import load_dotenv
 
+from submit_finetune_job import N_EPOCHS
+
 load_dotenv()
 
 
@@ -155,7 +157,7 @@ def calculate_and_print_statistics(lines: List[dict]) -> None:
         for entry in lines
     ]
     n_billing_tokens = calculate_billing_tokens(convo_lens)
-    n_epochs = estimate_n_epochs(len(lines))
+    n_epochs = estimate_n_epochs(len(lines), n_epochs=N_EPOCHS)
 
     print_billing_info(n_epochs, n_billing_tokens, 'gpt-4o-mini')
 
