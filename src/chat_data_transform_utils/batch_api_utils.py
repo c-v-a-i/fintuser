@@ -2,9 +2,9 @@ import time
 from typing import List, Tuple
 from openai.types import Batch
 from prisma import Prisma
-from openai_client import client
 import os
-from src.chat_data_transform_utils.process_batch_output import process_batch_output, save_response_to_db
+from process_batch_output import process_batch_output, save_response_to_db
+from openai_client.openai_client import client
 
 
 def write_batch_jsonl_file(batch_lines: List[str], filename: str) -> None:
@@ -90,7 +90,8 @@ async def process_completed_batches(
         if batch_obj.status == "completed":
             output_filename = os.path.join(api_call_result_dir, f"out-{batch_id}.jsonl")
             text_response = await process_batch_output(batch_obj, output_filename)
-            await save_response_to_db(text_response, db)
+            if text_response:
+                await save_response_to_db(text_response, db)
         else:
             print(f"Batch {batch_id} ended with status '{batch_obj.status}'. Skipping processing.")
 

@@ -2,8 +2,9 @@ import json
 from prisma.enums import Role
 from prisma import Prisma
 from openai.types import Batch
-from src.openai_client import client
-from src.chat_data_transform_utils.response_schema import GPTOutputSchema
+
+from .response_schema import GPTOutputSchema
+from .openai_client.openai_client import client
 
 
 async def save_response_to_db(text_response: str, db: Prisma):
@@ -77,13 +78,11 @@ async def save_response_to_db(text_response: str, db: Prisma):
             }
         )
 
-        print(f"Saved document {document_id} with {len(gpt_data.conversation_translation)} messages")
-
 
 async def process_batch_output(
         batch: Batch,
         output_filename
-) -> None:
+) -> str | None:
     """
     If the batch is completed, download the results, parse them,
     and store them in the DB.
@@ -92,7 +91,7 @@ async def process_batch_output(
     if batch_status != "completed":
         print(f"Batch {batch.id} not completed successfully. Final status: {batch_status}")
         print(f'batch: {batch}')
-        return
+        return None
 
     error_file_id = batch.error_file_id
 
@@ -100,7 +99,7 @@ async def process_batch_output(
         print("Error file presents.")
         content = client.files.content(batch.error_file_id)
         print(f"Error file content: {content.text}")
-        return
+        return None
 
     output_file_id = batch.output_file_id
     print(f"Batch {batch.id} completed. Output file: {output_file_id}")
@@ -115,3 +114,4 @@ async def process_batch_output(
         print(text_response, file=f)
 
     return text_response
+

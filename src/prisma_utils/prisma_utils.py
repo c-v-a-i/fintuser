@@ -1,7 +1,7 @@
 from prisma import Prisma
 
 
-async def connect_db() -> Prisma:
+async def get_prisma_db() -> Prisma:
     """Connect to the Prisma-managed database."""
     db = Prisma()
     await db.connect()

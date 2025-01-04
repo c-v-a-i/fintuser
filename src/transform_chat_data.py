@@ -6,15 +6,15 @@ from io import BytesIO
 from typing import Dict, List
 from typing import Any
 
-from src.batch_api_utils import chunk_batch_lines, write_batch_jsonl_file, create_and_submit_batch, poll_batches_until_done, process_completed_batches
-from src.chat_data_transform_utils.system_prompt import system_prompt
+from src.chat_data_transform_utils.batch_api_utils import chunk_batch_lines, write_batch_jsonl_file, create_and_submit_batch, poll_batches_until_done, process_completed_batches
+from chat_data_transform_utils.system_prompt import system_prompt
 from pdf2image import convert_from_path
 from prisma import Prisma
 from prisma.types import (
     DocumentUpsertInput,
 )
-from src.chat_data_transform_utils.build_batch_line import build_batch_line
-from src.prisma_utils import connect_db, disconnect_db
+from chat_data_transform_utils.build_batch_line import build_batch_line
+from prisma_utils.prisma_utils import get_prisma_db, disconnect_db
 
 JsonDict = Dict[str, Any]
 InputDataType = Dict[str, Dict[str, Any]]
@@ -103,7 +103,7 @@ async def main():
     8) Disconnect from DB.
     """
     # 7.1 Connect DB & load environment variables
-    db = await connect_db()
+    db = await get_prisma_db()
 
     # We assume this JSON file contains the "doc_id -> {...}" mapping
     input_json_path = "../json_files/pdf_children_texts_fBXQI.json"

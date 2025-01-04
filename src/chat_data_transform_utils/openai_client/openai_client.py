@@ -1,6 +1,8 @@
 import os
 from openai import OpenAI
+from dotenv import load_dotenv
 
+load_dotenv()
 
 class OpenAIClientSingleton:
     """
@@ -13,7 +15,7 @@ class OpenAIClientSingleton:
             print("Creating a new OpenAI client instance...")
             cls._instance = super(OpenAIClientSingleton, cls).__new__(cls)
             # Initialize the OpenAI client only once
-            cls._instance._client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            cls._instance._client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         return cls._instance
 
     def __getattr__(self, name):

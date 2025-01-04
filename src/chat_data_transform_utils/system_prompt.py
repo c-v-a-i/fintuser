@@ -71,6 +71,8 @@ type Messages = Array<{
 }>
 
 For each message object, only 'content' is to be translated. Your response_format defines the format of your response.
+Here's a domain-specific translation: "дев" is not a girl, but a short form of "девелопер", which translates to "dev" or "developer" in english.
+
 
 [INSTRUCTIONS TO MODEL]
 1. Analyze and convert the PNG document into YAML-based on the requirements above.
