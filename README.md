@@ -13,24 +13,11 @@ The idea is to use the reviews from this chat for fine-tuning an LLM.
 
 
 ## Description
+A repository with the python scripts needed for creating a dataset from fine-tuning and submitting all the jobs.
 
-We have exported the chat history in  [`result.json`](json_files/result.json).
-
-The messages are in russian, and they're unprocessed.
-
-In order to have meaningful results from the fine-tuning, we need to pre-process the messages so the dataset has the following format:
-```typescript
-type ProcessedMessages = {
-  [id in string]: {
-      messages: OpenaiMessage; // { type: 'user' | 'assistant'; content: string }
-      pdf_filename: string;
-  }
-}
-```
-
-I filtered out CVs with the names that don't make much sense. Like `xxxx.pdf` or `test.pdf` or `resume (79).pdf`.
-
-There are no script doing this job so far in the repo.
 
 - [create-message-chains.py](src/create_message_chains.py) takes care of transformation unstructured data into `ProcessedMessages` type.
 - [transform_chat_data.py](src/transform_chat_data.py) takes the output of `create-message-chains.py`, and uses gpt-4o-mini to translate the text into english and add a yaml representation of PDF documents. So we can fine-tune both on raw documents and the transcriptions of the documents.
+- [submit-finetune-job](src/submit_finetune_job.py) uploads a file with a fine-tuning dataset and submits a job
+- [build-finetune-dataset](src/build_finetune_dataset.py) creates a dataset for fine-tuning given the data in the database
+- [save-out-dir-to-db](src/save_out_dir_to_db.py) parser a directory with chatgpt dataset & pdf translations jobs output into prisma db. needs changes
