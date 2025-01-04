@@ -70,6 +70,7 @@ async def save_response_to_db(text_response: str, db: Prisma):
                 }
             )
 
+        # TODO: ideally, version, documentId should be a composite key, and there should be an upsert operation, not create
         await db.documenttranscription.create(
             {
                 "version": 1,
