@@ -6,7 +6,7 @@ from io import BytesIO
 from typing import Dict, List
 from typing import Any
 
-from src.chat_data_transform_utils.batch_api_utils import chunk_batch_lines, write_batch_jsonl_file, create_and_submit_batch, poll_batches_until_done, process_completed_batches
+from chat_data_transform_utils.batch_api_utils import chunk_batch_lines, write_batch_jsonl_file, create_and_submit_batch, poll_batches_until_done, process_completed_batches
 from chat_data_transform_utils.system_prompt import system_prompt
 from pdf2image import convert_from_path
 from prisma import Prisma
@@ -106,7 +106,7 @@ async def main():
     db = await get_prisma_db()
 
     # We assume this JSON file contains the "doc_id -> {...}" mapping
-    input_json_path = "../json_files/pdf_children_texts_fBXQI.json"
+    input_json_path = "../data/json_files/pdf_children_texts_ivGBh.json"
 
     # 7.2 Read input data
     data: InputDataType = load_input_data(input_json_path)
@@ -133,9 +133,10 @@ async def main():
         )
         all_batch_lines.append(line)
 
+    ## TODO: each batch should be no more than 90k tokens for gpt-4o.
     # 7.3.4 Split the lines into multiple chunked lists if the size is too large
-    chunked_batches = chunk_batch_lines(all_batch_lines, max_batch_file_size_bytes=200 * 1024 * 1024)
-    batch_dir = '../batches'
+    chunked_batches = chunk_batch_lines(all_batch_lines, max_batch_file_size_bytes=50 * 1024 * 1024)
+    batch_dir = '../data/batches'
     os.makedirs(batch_dir, exist_ok=True)
 
     # 7.4 Write each chunk to its own .jsonl file, then create & track the batch
@@ -151,12 +152,30 @@ async def main():
     final_batches = poll_batches_until_done(batch_ids, sleep_seconds=10)
 
     # 7.6 Process results from completed batches
-    api_call_result_dir = '../api_call_results'
+    api_call_result_dir = '../data/api_call_results'
     await process_completed_batches(db, final_batches, api_call_result_dir)
 
     # 7.7 Disconnect
     await disconnect_db(db)
 
 
+async def after_batches_completed(batches_ids: List[str]):
+    """
+    After all batches are completed, process the output files.
+    """
+    db = await get_prisma_db()
+
+    completed_batches = poll_batches_until_done(batches_ids, sleep_seconds=10)
+
+    api_call_result_dir = '../data/api_call_results'
+    await process_completed_batches(db, completed_batches, api_call_result_dir)
+
+    # 7.7 Disconnect
+    await disconnect_db(db)
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    # asyncio.run(main())
+    asyncio.run(after_batches_completed(
+        ['batch_6786c608481c819098fc8f1453a5bcbb', 'batch_6786c5ec39248190b133b5ca29a1c441', 'batch_6786c5f5eb4081909a4af1d2d87703bb', 'batch_6786c5fe86948190ad6c66f73bd5b770', 'batch_6786c60edbdc8190964604558d4816f8']
+    ))

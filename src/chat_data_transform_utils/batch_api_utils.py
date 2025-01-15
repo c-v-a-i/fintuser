@@ -3,8 +3,8 @@ from typing import List, Tuple
 from openai.types import Batch
 from prisma import Prisma
 import os
-from process_batch_output import process_batch_output, save_response_to_db
-from openai_client.openai_client import client
+from .process_batch_output import process_batch_output, save_response_to_db
+from .openai_client.openai_client import client
 
 
 def write_batch_jsonl_file(batch_lines: List[str], filename: str) -> None:
@@ -98,7 +98,7 @@ async def process_completed_batches(
 
 def chunk_batch_lines(
         all_lines: List[str],
-        max_batch_file_size_bytes: int = 200 * 1024 * 1024
+        max_batch_file_size_bytes: int = 20 * 1024 * 1024 # heuristics. max size is 200mb, but 90k tokens for a batch :)
 ) -> List[List[str]]:
     """
     Splits a list of JSON lines into smaller chunks so that each chunk's total

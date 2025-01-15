@@ -1,6 +1,6 @@
 import json
 import openai.lib._parsing as parsing
-from response_schema import GPTOutputSchema
+from .response_schema import GPTOutputSchema
 
 
 def build_batch_line(

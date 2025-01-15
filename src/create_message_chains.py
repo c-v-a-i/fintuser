@@ -1,9 +1,52 @@
 import json
+from typing import List
 import os
 from collections import defaultdict, deque
 from typing import Literal
 import random
 import string
+
+from build_finetune_dataset import Message
+
+MIN_REVIEW_LENGTH = 800
+
+
+class MessageEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Message):
+            return {
+                "role": obj.role,
+                "content": obj.content
+            }
+        return super().default(obj)
+
+
+
+def keep_only_the_longest_assistant_message(messages: List[Message]) -> List[Message]:
+    """
+    Keeps the longest assistant message and combines any preceding user messages into one.
+    """
+    assistant_messages = [m for m in messages if m.role == 'assistant']
+    if not assistant_messages:
+        return []
+
+    longest_message = max(assistant_messages, key=lambda m: len(m.content))
+    longest_index = messages.index(longest_message)
+
+    user_messages_before = [m.content for m in messages[:longest_index] if m.role == 'user']
+    combined_user_message = Message(role='user', content=' '.join(user_messages_before)) if user_messages_before else None
+
+    return [combined_user_message, longest_message] if combined_user_message else [longest_message]
+
+
+def heuristically_filter_data(messages: List[Message]) -> List[Message]:
+    """
+    Heuristically filters the data to remove unwanted messages.
+    Retains the list only if the total length of assistant messages is > MIN_REVIEW_LENGTH.
+    """
+    if sum(len(m.content) for m in messages if m.role == 'assistant') > MIN_REVIEW_LENGTH:
+        return messages
+    return []
 
 
 def get_all_files_as_dictionary(directory_path: str) -> dict:
@@ -35,13 +78,17 @@ def is_message_with_cv(message: dict, cv_directory_content: dict) -> bool:
 def extract_plain_text(message: dict) -> str:
     """
     Given a message dict with a 'text_entities' field,
-    return the concatenation of all 'plain' text segments.
+    return the concatenation of all 'plain' text segments, adding 'blockquote' to them.
     """
     text_entities = message.get("text_entities", [])
     chunks = []
     for entity in text_entities:
         if entity.get("type") == "plain":
             chunks.append(entity.get("text", ""))
+        if entity.get("type") == "blockquote":
+            chunks.append(
+                f'\n> {entity.get("text", "")}\n'
+            )
     return "".join(chunks)
 
 
@@ -86,12 +133,8 @@ def main():
     # ----------------------------------------------------------------------
     # 1) LOAD THE TOP-LEVEL JSON
     # ----------------------------------------------------------------------
-    with open("result.json", "r", encoding="utf-8") as f:
+    with open("../data/raw_chat_data/result.json", "r", encoding="utf-8") as f:
         data = json.load(f)
-
-    with open('pdf_children_texts.json', "r", encoding="utf-8") as f:
-        ids_to_keep = {k: True for k in list(json.load(f).keys())}
-        print('ids to keep:', ids_to_keep)
 
     # data now contains something like:
     # {
@@ -114,7 +157,7 @@ def main():
     # ----------------------------------------------------------------------
     # 3) PREPARE CV DIRECTORY LOOKUP
     # ----------------------------------------------------------------------
-    cv_directory_path = "../files"
+    cv_directory_path = "../data/files"
     cv_directory_content = get_all_files_as_dictionary(cv_directory_path)
 
     # ----------------------------------------------------------------------
@@ -140,53 +183,57 @@ def main():
             descendants = bfs_collect_subtree(root_id, graph)
 
             # Gather all plain text from those descendants
-            child_texts = []
+            child_texts: List[Message] = []
             for child_id in descendants:
                 child_message = messages_dict[child_id]
                 text_str = extract_plain_text(child_message)
                 user_id = child_message['from_id']
                 role = get_role(user_id, root_user_id)
                 if text_str:
-                    child_texts.append({
-                        'role': role,
-                        'content': text_str
-                    })
-                    # child_texts.append(text_str)
+                    child_texts.append(Message(
+                        role=role,
+                        content=text_str
+                    ))
 
             # Only if we have non-empty messages do we store in final_result
             if child_texts:
-                # Use string root_id for the JSON keys
                 final_result[str(root_id)] = {
                     "messages": child_texts,
                     "pdf_filepath": pdf_filepath
                 }
 
-    final_result = {
-        k: v for k, v in final_result.items() if k in ids_to_keep
-    }
+    # ----------------------------------------------------------------------
+    # TODO: go over all the records and filter out the instances
+    #       based on the functions above
+    # ----------------------------------------------------------------------
+    # We'll iterate over each record in `final_result` and do two things:
+    #   (1) Keep only the longest assistant message + combined user messages before it
+    #   (2) Filter out any items that do not meet the heuristic length requirement.
+    # If an item fails the filter (returns an empty list), we remove it from final_result.
+    # ----------------------------------------------------------------------
+    for root_id, item in list(final_result.items()):
+        current_messages = item["messages"]
+        # keep only the longest assistant message (plus preceding user messages)
+        current_messages = keep_only_the_longest_assistant_message(current_messages)
+        # apply heuristic filter (must exceed MIN_REVIEW_LENGTH in assistant messages)
+        current_messages = heuristically_filter_data(current_messages)
+
+        if not current_messages:
+            del final_result[root_id]
+        else:
+            item["messages"] = current_messages
 
     # ----------------------------------------------------------------------
     # 6) OUTPUT / POST-PROCESS / SAVE RESULTS
     # ----------------------------------------------------------------------
-    # final_result structure:
-    #
-    # {
-    #   "123": {
-    #     "messages": [
-    #       "descendant message text #1", 
-    #       "descendant message text #2", ...
-    #     ],
-    #     "pdf_filepath": "files/my_resume.pdf"
-    #   },
-    #   "456": { ... },
-    #   ...
-    # }
-    #
     random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=5))
-
     result_filename = f"pdf_children_texts_{random_string}.json"
     with open(result_filename, "w", encoding="utf-8") as out_f:
-        json.dump(final_result, out_f, ensure_ascii=False, indent=2)
+        json.dump(final_result, out_f, ensure_ascii=False, indent=2, cls=MessageEncoder)
+
+    print(f"Saved the result to {result_filename}")
+    print(f"Total number of records: {len(final_result)}")
+    print('Minimal assistant message length:', MIN_REVIEW_LENGTH)
 
 
 if __name__ == "__main__":

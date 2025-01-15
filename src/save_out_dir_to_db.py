@@ -31,5 +31,5 @@ async def main(directory: str) -> None:
 
 if __name__ == '__main__':
     # Allow passing a directory as a command-line argument or default to ./outputs
-    target_dir = sys.argv[1] if len(sys.argv) > 1 else '../api_call_results'
+    target_dir = sys.argv[1] if len(sys.argv) > 1 else '../data/api_call_results'
     asyncio.run(main(target_dir))

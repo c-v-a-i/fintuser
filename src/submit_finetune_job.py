@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-N_EPOCHS = 2
+N_EPOCHS = 8
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_API_BASE = "https://api.openai.com/v1"
 MODEL = "gpt-4o-mini-2024-07-18"
@@ -69,7 +69,8 @@ def create_finetune_job(file_id: str, model: str, n_epochs: int):
             "type": "supervised",
             "supervised": {
                 "hyperparameters": {
-                    "n_epochs": n_epochs
+                    "n_epochs": n_epochs,
+                    "batch_size": 4,
                 }
             }
         }

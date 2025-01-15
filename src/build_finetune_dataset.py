@@ -12,6 +12,8 @@ Usage:
 
 import asyncio
 import json
+import os
+import glob
 from typing import List, Literal
 from fine_tuning_utils.system_prompt import system_prompt
 from prisma_utils.prisma_utils import disconnect_db, get_prisma_db
@@ -32,60 +34,28 @@ class Message(BaseModel):
         return self.model_dump_json()
 
 
-def collapse_messages(messages: List[Message]) -> List[Message]:
-    new_messages = []
-    prev_role = messages[0].role
-    content_acc = messages[0].content
-
-    # Start from the second message to compare roles
-    for message in messages[1:]:
-        if message.role != prev_role:
-            # Append the previous chunk before switching roles
-            new_messages.append(
-                Message(
-                    role=prev_role,
-                    content=content_acc,
-                )
-            )
-            # Reset accumulators
-            prev_role = message.role
-            content_acc = message.content
-        else:
-            content_acc += f'\n{message.content}'
-
-    # Append whatever remains
-    new_messages.append(
-        Message(
-            role=prev_role,
-            content=content_acc,
-        )
-    )
-
-    return new_messages
-
-
-def split_messages(messages: List[Message]) -> List[List[Message]]:
-    samples = []
-    # Use `+ 1` so that 2 messages produce exactly 1 sample containing both
-    for i in range(1, (len(messages) // 2) + 1):
-        samples.append(messages[: i * 2])
-    return samples
-
-
-async def build_finetune_dataset() -> List[dict]:
+async def build_finetune_dataset(include_ids: List[str]) -> List[dict]:
     """
     Fetches data from the database, processes it, and returns a list of fine-tuning dataset lines.
+    Only documents whose id is in include_ids are retrieved.
     """
     prisma = await get_prisma_db()
 
-    # Fetch all documents, including relations
     documents = await prisma.document.find_many(
+        where={
+            "id": {
+                "in": include_ids
+            }
+        },
         include={
             "messages": True,
             "DocumentTranscription": True,
         },
     )
     print(f"Found {len(documents)} documents...")
+
+    await disconnect_db(prisma)
+    exit(0)
 
     lines = []
 
@@ -105,34 +75,27 @@ async def build_finetune_dataset() -> List[dict]:
             print(f'WARN -- no messages for {doc.id}')
             continue
 
-        # Prepend document representation
-        starter_message: Message = Message(
-            role='user',
-            content=document_representation
-        )
-
-        document_conversation: List[Message] = [starter_message] + [
+        fine_tuning_entries: List[Message] = [
             Message(role=m.role, content=m.content) for m in doc.messages
         ]
 
-        # Combine repeating messages together
-        collapsed_messages = collapse_messages(document_conversation)
+        if not fine_tuning_entries:
+            print(f'WARN -- no assistant messages for {doc.id}')
+            continue
 
-        # Split messages into multiple samples
-        fine_tuning_entries = split_messages(collapsed_messages)
-
-        new_samples = list(map(lambda conversation_slice: {
-            'messages': [
-                {'role': 'system', 'content': system_prompt},
-                *[message.model_dump() for message in conversation_slice]
-            ]
-        }, fine_tuning_entries))
+        new_samples = [
+            {
+                'messages': [
+                    {'role': 'system', 'content': system_prompt},
+                    {'role': 'user', 'content': document_representation},
+                    *[message.model_dump() for message in conversation_slice]
+                ]
+            }
+            for conversation_slice in [fine_tuning_entries]
+        ]
 
         print(f'{doc.id}  About to add {len(new_samples)} new samples...')
-        # Add system prompt and serialize
-        lines.extend(
-            new_samples
-        )
+        lines.extend(new_samples)
 
     await disconnect_db(prisma)
     return lines
@@ -162,9 +125,33 @@ def calculate_and_print_statistics(lines: List[dict]) -> None:
     print_billing_info(n_epochs, n_billing_tokens, 'gpt-4o-mini')
 
 
+def gather_include_ids(directory: str) -> List[str]:
+    """
+    Reads all .jsonl files in the specified directory, collects 'custom_id' values
+    from each line, and returns them as a list.
+    """
+    include_ids = []
+    for file_path in glob.glob(os.path.join(directory, "*.jsonl")):
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    data = json.loads(line)
+                    if "custom_id" in data:
+                        include_ids.append(data["custom_id"])
+                except json.JSONDecodeError:
+                    print(f"Warning: Could not parse JSON in {file_path}: {line}")
+    return include_ids
+
+
 async def main(out_file: str):
-    # Build the dataset
-    lines = await build_finetune_dataset()
+    # Collect all custom IDs from ../data/api_call_results/*.jsonl
+    custom_ids = gather_include_ids("../data/api_call_results")
+    print(
+        f"Found {len(custom_ids)} custom IDs in ../data/api_call_results/*.jsonl"
+    )
+
+    # Pass those IDs into the build_finetune_dataset function
+    lines = await build_finetune_dataset(include_ids=custom_ids)
 
     print(f'Total lines: {len(lines)}')
 
@@ -176,6 +163,5 @@ async def main(out_file: str):
 
 
 if __name__ == "__main__":
-    OUTPUT_FILE = "../fine_tune_data/finetune_dataset.jsonl"
-
+    OUTPUT_FILE = "../data/fine_tune_data/second_try_only_800plus_response_tokens.jsonl"
     asyncio.run(main(OUTPUT_FILE))
