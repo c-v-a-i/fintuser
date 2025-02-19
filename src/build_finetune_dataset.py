@@ -1,20 +1,22 @@
-#!/usr/bin/env python3
-
 """
 build-finetune-dataset.py
 -------------------------
-Fetches data from your PostgreSQL (via Prisma) and creates a .jsonl file
-suitable for OpenAI fine-tuning using the chat format.
+Fetches data from your PostgreSQL (via Prisma) and creates two .jsonl files
+(suitable for OpenAI fine-tuning using the chat format) for training and validation.
 
 Usage:
   ./build-finetune-dataset.py
 """
 
+import random
 import asyncio
 import json
 import os
 import glob
 from typing import List, Literal
+
+from prisma.enums import Role
+
 from fine_tuning_utils.system_prompt import system_prompt
 from prisma_utils.prisma_utils import disconnect_db, get_prisma_db
 from pydantic import BaseModel
@@ -25,9 +27,11 @@ from submit_finetune_job import N_EPOCHS
 
 load_dotenv()
 
+TESTING_MODE = True
+
 
 class Message(BaseModel):
-    role: Literal['user', 'assistant', 'system']
+    role: Role
     content: str
 
     def to_json(self) -> str:
@@ -54,8 +58,10 @@ async def build_finetune_dataset(include_ids: List[str]) -> List[dict]:
     )
     print(f"Found {len(documents)} documents...")
 
-    await disconnect_db(prisma)
-    exit(0)
+    if TESTING_MODE:
+        import random
+        random.shuffle(documents)
+        documents = documents[:50]
 
     lines = []
 
@@ -79,8 +85,11 @@ async def build_finetune_dataset(include_ids: List[str]) -> List[dict]:
             Message(role=m.role, content=m.content) for m in doc.messages
         ]
 
-        if not fine_tuning_entries:
-            print(f'WARN -- no assistant messages for {doc.id}')
+        if fine_tuning_entries and fine_tuning_entries[-1].role == 'user':
+            fine_tuning_entries.pop()
+
+        if not any(message.role == 'assistant' for message in fine_tuning_entries):
+            print(f'Incorrect document {doc.id}: no assistant message after processing.')
             continue
 
         new_samples = [
@@ -88,13 +97,12 @@ async def build_finetune_dataset(include_ids: List[str]) -> List[dict]:
                 'messages': [
                     {'role': 'system', 'content': system_prompt},
                     {'role': 'user', 'content': document_representation},
-                    *[message.model_dump() for message in conversation_slice]
+                    *[message.model_dump() for message in fine_tuning_entries]
                 ]
             }
-            for conversation_slice in [fine_tuning_entries]
         ]
 
-        print(f'{doc.id}  About to add {len(new_samples)} new samples...')
+        print(f'{doc.id}  About to add {len(new_samples)} new sample(s)...')
         lines.extend(new_samples)
 
     await disconnect_db(prisma)
@@ -155,13 +163,30 @@ async def main(out_file: str):
 
     print(f'Total lines: {len(lines)}')
 
-    # Save to file
-    save_finetune_dataset(lines, output_file=out_file)
+    # Shuffle and split data into training and validation sets (validation up to 20%)
+    random.shuffle(lines)
+    val_count = int(len(lines) * 0.2)
+    validation = lines[:val_count]
+    train = lines[val_count:]
+    print(f"Training examples: {len(train)}")
+    print(f"Validation examples: {len(validation)}")
 
-    # Print statistics
-    calculate_and_print_statistics(lines)
+    # Generate separate output file names based on the provided out_file
+    base, ext = os.path.splitext(out_file)
+    train_file = f"{base}_train{ext}"
+    val_file = f"{base}_val{ext}"
+
+    # Save each split to its respective file
+    save_finetune_dataset(train, output_file=train_file)
+    save_finetune_dataset(validation, output_file=val_file)
+
+    # Print statistics for each split
+    print("Training dataset statistics:")
+    calculate_and_print_statistics(train)
+    print("Validation dataset statistics:")
+    calculate_and_print_statistics(validation)
 
 
 if __name__ == "__main__":
-    OUTPUT_FILE = "../data/fine_tune_data/second_try_only_800plus_response_tokens.jsonl"
+    OUTPUT_FILE = "../data/fine_tune_data/latest-min650-full.jsonl"
     asyncio.run(main(OUTPUT_FILE))

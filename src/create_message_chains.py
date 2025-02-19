@@ -8,7 +8,7 @@ import string
 
 from build_finetune_dataset import Message
 
-MIN_REVIEW_LENGTH = 800
+MIN_REVIEW_LENGTH = 650
 
 
 class MessageEncoder(json.JSONEncoder):
@@ -223,11 +223,19 @@ def main():
         else:
             item["messages"] = current_messages
 
+    # check if there are messages where assistant is not the last message
+    for root_id, item in list(final_result.items()):
+        current_messages = item["messages"]
+        if current_messages[-1].role != 'assistant':
+            print(f'Assistant is not the last message in the conversation', root_id, item["messages"])
+            print('\n\n\n\n')
+            # del final_result[root_id]
+
     # ----------------------------------------------------------------------
     # 6) OUTPUT / POST-PROCESS / SAVE RESULTS
     # ----------------------------------------------------------------------
     random_string = ''.join(random.choices(string.ascii_letters + string.digits, k=5))
-    result_filename = f"pdf_children_texts_{random_string}.json"
+    result_filename = f"../data/json_files/pdf_children_texts_{random_string}_min{MIN_REVIEW_LENGTH}.json"
     with open(result_filename, "w", encoding="utf-8") as out_f:
         json.dump(final_result, out_f, ensure_ascii=False, indent=2, cls=MessageEncoder)
 

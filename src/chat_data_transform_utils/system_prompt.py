@@ -72,6 +72,7 @@ type Messages = Array<{
 For each message object, only 'content' is to be translated. Your response_format defines the format of your response.
 Here's a domain-specific translation: "дев" is not a girl, but a short form of "девелопер", which translates to "dev" or "developer" in english.
 There are other domain-specific words, like "копипаст", "попипаст" or even words from 2ch (russian 4chan).
+So, you just perform a transformation: {'role': <role>, 'content': <content>} => {'role': <role>, 'content': <translated_content>} 
 
 [INSTRUCTIONS TO MODEL]
 1. Analyze and convert the PNG document into YAML-based on the requirements above.

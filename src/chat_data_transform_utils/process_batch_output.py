@@ -61,24 +61,62 @@ async def save_response_to_db(text_response: str, db: Prisma):
 
         for msg in gpt_data.conversation_translation:
             prisma_role: Role = Role.assistant if msg.type == "assistant" else Role.user
+            # there was a weird bug of gpt converting assistants messages to user messages.
+            if len(gpt_data.conversation_translation) == 1:
+                prisma_role = Role.assistant
 
-            await db.documentmessage.create(
-                {
-                    "role": prisma_role,
-                    "content": msg.content,
-                    "documentId": document_id
+            existing_message = await db.documentmessage.find_first(
+                where={
+                    "documentId": document_id,
+                    "content": msg.content
                 }
             )
+            if existing_message:
+                await db.documentmessage.upsert(
+                    where={
+                        "id": existing_message.id
+                    },
+                    data={
+                        'create': {
+                            "role": prisma_role,
+                            "content": msg.content,
+                            "documentId": document_id
+                        },
+                        'update': {
+                            "role": prisma_role,
+                            "content": msg.content,
+                        }
+                    }
+                )
+            else:
+                await db.documentmessage.create(
+                    data={
+                        "role": prisma_role,
+                        "content": msg.content,
+                        "documentId": document_id
+                    }
+                )
 
         # TODO: ideally, version, documentId should be a composite key, and there should be an upsert operation, not create
-        await db.documenttranscription.create(
-            {
-                "version": 1,
-                "document_representation": gpt_data.document_representation,
-                "documentId": document_id
+        await db.documenttranscription.upsert(
+            where={
+                "version_documentId": {
+                    "documentId": document_id,
+                    'version': 1
+                },
+            },
+            data={
+                'create': {
+                    "documentId": document_id,
+                    "version": 1,
+                    "document_representation": gpt_data.document_representation
+
+                },
+                'update': {
+                    "document_representation": gpt_data.document_representation
+                }
             }
         )
-
 
 async def process_batch_output(
         batch: Batch,

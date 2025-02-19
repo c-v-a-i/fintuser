@@ -9,7 +9,7 @@ from typing import Any
 from chat_data_transform_utils.batch_api_utils import chunk_batch_lines, write_batch_jsonl_file, create_and_submit_batch, poll_batches_until_done, process_completed_batches
 from chat_data_transform_utils.system_prompt import system_prompt
 from pdf2image import convert_from_path
-from prisma import Prisma
+from prisma import Prisma, Base64
 from prisma.types import (
     DocumentUpsertInput,
 )
@@ -67,7 +67,7 @@ async def process_document(
 
             # Base64-encode for the model prompt
             base64_bytes = base64.b64encode(png_bytes)
-            png_bytes_b64 = base64_bytes.decode("utf-8")
+            png_bytes_b64 = Base64(base64_bytes)
 
             # Upsert Document
             upsert_data: DocumentUpsertInput = {
@@ -87,16 +87,14 @@ async def process_document(
     return png_bytes_b64
 
 
-# ----------------------------------------------------------------------------
-# 7. ORCHESTRATION (MAIN)
-# ----------------------------------------------------------------------------
 async def main():
     """
+    Translated the messages to english
     1) Connect to DB.
     2) Load input data (doc_id -> { messages, pdf_filepath }).
     3) For each doc, create PNG (if PDF), store in DB as base64, build
        prompt line -> collect all in 'all_batch_lines'.
-    4) Split those lines into multiple .jsonl chunk files if they exceed ~200MB.
+    4) Split those lines into multiple .jsonl chunk files if they exceed ~200MB. TODO: there was a problem when using GPT-4, because of the number of tokens in the batch
     5) Create a separate OpenAI batch for each chunk file.
     6) Poll all batch jobs until done.
     7) For each completed batch, retrieve & process output (store in DB).
@@ -106,7 +104,8 @@ async def main():
     db = await get_prisma_db()
 
     # We assume this JSON file contains the "doc_id -> {...}" mapping
-    input_json_path = "../data/json_files/pdf_children_texts_ivGBh.json"
+    # input_json_path = "../data/json_files/pdf_children_texts_W4uy6_min650.json"
+    input_json_path = "../data/json_files/pdf_children_texts_W4uy6_min650.json"
 
     # 7.2 Read input data
     data: InputDataType = load_input_data(input_json_path)
@@ -175,7 +174,4 @@ async def after_batches_completed(batches_ids: List[str]):
 
 
 if __name__ == "__main__":
-    # asyncio.run(main())
-    asyncio.run(after_batches_completed(
-        ['batch_6786c608481c819098fc8f1453a5bcbb', 'batch_6786c5ec39248190b133b5ca29a1c441', 'batch_6786c5f5eb4081909a4af1d2d87703bb', 'batch_6786c5fe86948190ad6c66f73bd5b770', 'batch_6786c60edbdc8190964604558d4816f8']
-    ))
+    asyncio.run(main())

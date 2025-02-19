@@ -36,4 +36,6 @@ model DocumentTranscription {
   document_representation String
   documentId              String
   document                Document @relation(fields: [documentId], references: [id])
+
+  @@unique([version, documentId])
 }
